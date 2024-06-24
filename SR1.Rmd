@@ -1,0 +1,371 @@
+---
+title: "SR1"
+author: "petergraffy"
+date: "2024-02-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(mapdata)
+library(mapproj)
+library(gridExtra)
+library(viridis)
+
+```
+
+# read in the data
+
+```{r}
+
+dat <- read.csv("SR1.csv")
+
+```
+
+# make a new df of counts of each country
+
+```{r}
+# Count occurrences of each country
+country_counts <- dat %>%
+  group_by(COUNTRY) %>%
+  summarise(count = n())
+```
+
+# map data
+
+```{r}
+# Load world map data
+world_map <- map_data("world")
+
+colnames(country_counts) <- c("region", "value")
+
+```
+
+# left join world_map and country_counts by region
+
+```{r}
+
+map <- left_join(world_map, country_counts, by='region')
+
+```
+
+# make a map of the countries with studies
+
+```{r}
+
+map_with_values <- subset(map, value > 0)
+
+p <- ggplot(map, aes(x = long, y = lat, group = group)) +
+  geom_polygon(aes(fill = value), color = 'white', size = 0.1) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", name = "# of Studies") +
+  theme_bw() +
+  coord_quickmap() + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) 
+
+p
+
+#ggsave("world11notitle.png", p, width = 10, height = 7, dpi = 300)
+
+```
+
+```{r}
+
+# #example from web
+# library(ggplot2)
+# map <- map_data('world')
+# map$value <- setNames(sample(1:50, 252, T), unique(map$region))[map$region]
+# p <- ggplot(map, aes(long, lat, group=group, fill=value)) +
+# geom_polygon() +
+# coord_quickmap(xlim = c(-100,100), ylim=c(50,75)) +
+# geom_polygon(data = subset(map, region=='Germany'), fill = 'red')
+# p
+
+
+```
+
+# figure for the journals represented
+
+```{r}
+
+# Count occurrences of each journal
+journal_counts <- dat %>%
+  count(JOURNAL) %>%
+  arrange(desc(n))
+
+journal_counts$JOURNAL <- gsub("\\[Electronic Resource\\]", "", journal_counts$JOURNAL)
+
+# Set the number of top journals to show on the plot
+top_n <- 10  # Change this to the desired number of top journals
+
+# Select the top N journals
+top_journals <- head(journal_counts, n = top_n)
+
+# Plot the bar chart
+p2 <- ggplot(top_journals, aes(x = reorder(JOURNAL, n), y = n)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  theme_bw() +
+  labs(title = "The 10 Most Common Journals", x = "", y = "Number of Papers") +
+  theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  theme(plot.title = element_text(size = 16, hjust = 0.5)) +
+  coord_flip() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),  # Remove panel border
+        axis.line = element_line(color = "black"))  # Remove gridlines
+
+p2
+#ggsave("journals.png", p2, width = 10, height = 7, dpi = 300)
+
+```
+
+# year of journal publication
+
+```{r}
+
+p3 <- ggplot(dat, aes(x = YEAR)) +
+  geom_histogram(binwidth = 1, fill = "skyblue", color = "white") +
+  theme_bw() +
+  labs(title = "Number of Publications per Year", x = "Year", y = "Number of Publications") +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),  # Remove panel border
+        axis.line = element_line(color = "black")) 
+
+p3
+
+#ggsave("journalsyears.png", p3, width = 10, height = 7, dpi = 300)
+
+```
+
+# sample size figures
+
+```{r}
+
+# Remove rows where the sample size is "Unreported" and remove commas/punctuation from the N column
+dat_cleaned <- dat %>%
+  filter(N != "Unreported") %>%
+  mutate(N = as.numeric(gsub("[[:punct:]]", "", N)))
+
+dat_filtered <- dat_cleaned %>%
+  group_by(COUNTRY) %>%
+  filter(n() > 1)
+
+# Create the box plot with filtered data and a different color palette
+p4 <- ggplot(dat_filtered, aes(x = factor(COUNTRY), y = N)) +
+  geom_boxplot(fill = viridis_pal(option = "D")(n_distinct(dat_filtered$COUNTRY)), color = "black") +
+  theme_bw() +
+  ylim(0, 1500000) +
+  labs(title = "Distribution of Sample Size by Countries with > 1 Study", x = "Country", y = "Sample Size") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),  # Remove panel border
+        axis.line = element_line(color = "black"))   # Rotate x-axis labels
+
+p4
+
+#ggsave("sample.png", p4, width = 10, height = 7, dpi = 300)
+
+```
+
+# methodologies
+
+```{r}
+
+# dat <- read.csv("SR2.csv")
+
+method_counts <- dat %>%
+  count(METHOD) %>%
+  arrange(desc(n))
+
+top_methods <- head(method_counts, 10)
+
+# Plot the bar chart
+p11 <- ggplot(top_methods, aes(x = reorder(METHOD, n), y = n)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "white") +
+  theme_bw() +
+  labs(title = "Top 10 Most Frequent Methods", x = "", y = "Count") +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5)) +
+  theme(plot.title = element_text(size = 16, hjust = 0.5)) +
+  coord_flip() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),  # Remove panel border
+        axis.line = element_line(color = "black"))
+
+p11
+
+#ggsave("samplemeth.png", p11, width = 10, height = 7, dpi = 300)
+
+```
+
+
+```{r}
+# Filter rows where the METHOD column contains "DLNM"
+dlnm_counts <- dat %>%
+  filter(grepl("DLNM", METHOD)) %>%
+  count()
+
+# Plot the bar chart
+ggplot(dlnm_counts, aes(x = "DLNM", y = n)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Frequency of DLNM Method", x = "Method", y = "Count")
+
+```
+
+
+```{r}
+# Create a new column indicating the method category
+dat <- dat %>%
+  mutate(method_category = case_when(
+    grepl("DLNM", METHOD) ~ "DLNM",
+    grepl("conditional logistic regression", METHOD, ignore.case = TRUE) ~ "Conditional Logistic Regression",
+    TRUE ~ "Other"
+  ))
+
+# Calculate the proportions
+method_proportions <- dat %>%
+  count(method_category) %>%
+  mutate(proportion = n / sum(n))
+
+# Arrange categories from high to low
+method_proportions <- method_proportions %>%
+  arrange(desc(n)) %>%
+  mutate(method_category = factor(method_category, levels = method_category))
+
+# Plot the bar chart
+p5 <- ggplot(method_proportions, aes(x = method_category, y = proportion, fill = method_category)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  labs(title = "Proportion of All Studies by Method Category", x = "", y = "Proportion") +
+  scale_fill_manual(values = c("DLNM" = "skyblue", "Conditional Logistic Regression" = "orange", "Other" = "gray"),
+                    name = "Method") +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),  # Remove panel border
+        axis.line = element_line(color = "black"))
+
+p5
+
+#ggsave("method.png", p5, width = 10, height = 7, dpi = 300)
+
+
+```
+
+
+# methods by country
+
+```{r}
+
+
+# Filter the data to include only countries with more than one study
+dat_filtered <- dat %>%
+  group_by(COUNTRY) %>%
+  filter(n() > 1)
+
+# Create a summary of the most common method by country
+common_method_by_country <- dat_filtered %>%
+  group_by(COUNTRY, METHOD) %>%
+  summarise(count = n()) %>%
+  arrange(COUNTRY, desc(count)) %>%
+  slice(1)  # Select the top method for each country
+
+# Plot the bar chart
+p6 <- ggplot(common_method_by_country, aes(x = reorder(COUNTRY, -count), y = count, fill = METHOD)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Most Common Method by Country (Countries with >1 Study)", x = "", y = "# of Times Used", fill = "Method") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +  # Placing legend below the plot
+  guides(fill = guide_legend(nrow = 7, ncol = 2))  # Adjusting legend layout
+p6
+
+#ggsave("method3.png", p6, width = 10, height = 7, dpi = 300)
+
+```
+
+```{r}
+# Filter the data to include only countries with more than one study
+dat_filtered <- dat %>%
+  group_by(COUNTRY) %>%
+  filter(n() > 1)
+
+# Create a summary of the most common method by country
+common_method_by_country <- dat_filtered %>%
+  group_by(COUNTRY, METHOD) %>%
+  summarise(count = n()) %>%
+  arrange(COUNTRY, desc(count)) %>%
+  slice(1)  # Select the top method for each country
+
+# Filter out countries with a frequency of 1
+common_method_by_country_filtered <- common_method_by_country %>%
+  group_by(COUNTRY) %>%
+  filter(sum(count) > 1)
+
+# Plot the bar chart
+p6 <- ggplot(common_method_by_country_filtered, aes(x = reorder(COUNTRY, -count), y = count, fill = METHOD)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  labs(title = "Most Common Method by Country (Countries with >1 Study)", x = "", y = "# of Times Used", fill = "Method") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),  # Remove panel border
+        axis.line = element_line(color = "black"))   # Placing legend below the plot
+
+p6
+
+#ggsave("method4.png", p6, width = 10, height = 7, dpi = 300)
+```
+
+```{r}
+
+# Filter the data for the specified countries
+countries <- c("China", "USA", "Australia", "Brazil", "Iran")
+dat_filtered <- dat %>%
+  filter(COUNTRY %in% countries)
+
+# Create a summary of the method categories for the specified countries
+method_summary <- dat_filtered %>%
+  mutate(method_category = case_when(
+    grepl("DLNM", METHOD) ~ "DLNM",
+    grepl("conditional logistic regression", METHOD, ignore.case = TRUE) ~ "Conditional Logistic Regression",
+    TRUE ~ "Other"
+  )) %>%
+  group_by(COUNTRY, method_category) %>%
+  summarise(count = n()) %>%
+  group_by(COUNTRY) %>%
+  mutate(proportion = count / sum(count))
+
+# Plot the stacked bar chart
+p7 <- ggplot(method_summary, aes(x = COUNTRY, y = proportion, fill = method_category)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  labs(title = "Proportion of Methods by Country", x = "Country", y = "Proportion", fill = "Method Category") +
+  scale_fill_manual(values = c("DLNM" = "skyblue", "Conditional Logistic Regression" = "orange", "Other" = "gray")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank())+ theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),  # Remove panel border
+        axis.line = element_line(color = "black"))  # Remove minor gridlines
+
+p7
+
+#ggsave("methodprop.png", p7, width = 10, height = 7, dpi = 300)
+
+```
+
+
+
+
+
+
+
+

@@ -1,0 +1,182 @@
+---
+title: "SR4"
+author: "petergraffy"
+date: "2024-03-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(mapdata)
+library(mapproj)
+library(gridExtra)
+library(viridis)
+library(countrycode)
+library(tableone)
+library(kableExtra)
+
+```
+
+# read in data
+
+```{r}
+
+dat <- read.csv("SR3.csv")
+
+length(unique(dat$SOURCE))
+
+
+length(unique(dat$PTDATA))
+
+```
+
+
+```{r}
+
+dat$`Publication Date` <- ifelse(dat$PUBYEAR >= 1990 & dat$PUBYEAR < 1995, "1990-1995",
+                      ifelse(dat$PUBYEAR >= 1995 & dat$PUBYEAR < 2000, "1995-2000",
+                             ifelse(dat$PUBYEAR >= 2000 & dat$PUBYEAR < 2005, "2000-2005",
+                                    ifelse(dat$PUBYEAR >= 2005 & dat$PUBYEAR < 2010, "2005-2010",
+                                           ifelse(dat$PUBYEAR >= 2010 & dat$PUBYEAR < 2015, "2010-2015",
+                                                  ifelse(dat$PUBYEAR >= 2015 & dat$PUBYEAR < 2020, "2015-2020",
+                                                         ifelse(dat$PUBYEAR >= 2020 & dat$PUBYEAR < 2025, "2020-Present", NA)))))))
+
+
+decade_label <- function(START) {
+  END <- START + 9
+  return(paste(START, END, sep = "-"))
+}
+
+dat$`Study Start` <- cut(dat$START, 
+                   breaks = seq(1880, 2020, by = 10),
+                   labels = sapply(seq(1880, 2010, by = 10), decade_label),
+                   include.lowest = TRUE)
+
+
+#write.csv(dat, "SR4.csv")
+
+```
+
+
+```{r}
+table(dat$COUNTRY)
+
+dat_filtered <- dat %>%
+  group_by(COUNTRY) %>%
+  filter(n() > 1)
+
+table(dat_filtered$COUNTRY)
+
+#write.csv(dat_filtered, "SRfiltered.csv")
+```
+
+
+#### start here
+
+```{r}
+dat <- read.csv("SRfiltered.csv")
+
+```
+
+
+
+# tile plot of countries most found in SR3
+
+
+```{r}
+
+dat$COUNTRY <- as.factor(dat$COUNTRY)
+dat$DESIGN <- as.factor(dat$DESIGN)
+dat$Meth <- as.factor(dat$Meth)
+
+# # Define desired countries
+# desired_countries <- c("Australia", "Brazil", "China", "Germany", "Greece", "Iran", "South Korea", "Switzerland", "USA", "Vietnam")
+# 
+# # Filter the dataset
+# dat_filtered <- dat %>% 
+#   filter(COUNTRY %in% desired_countries)
+
+# Group by COUNTRY, DESIGN, and Meth, and count occurrences
+
+method_counts <- dat %>%
+  group_by(COUNTRY, DESIGN, Meth) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  slice(1)
+
+# Now, create the heatmap with text labels
+p1 <- ggplot(method_counts, aes(x = COUNTRY, y = DESIGN, fill = Meth, label = Count)) +
+  geom_tile() +
+  geom_text(color = "black", size = 3) + # Add text labels
+  scale_fill_brewer(palette = "Set3") + # You can choose a different palette if needed
+  labs(x = "Country", y = "Design", fill = "Method") +
+  theme_minimal() + 
+  coord_flip() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),  # Remove panel border
+        axis.line = element_line(color = "black")) # Remove axis lines
+
+p1
+
+
+#ggsave("tileplot.png", p1, width = 10, height = 7, dpi = 300)
+
+```
+
+
+```{r}
+
+
+
+method_colors <- c("Conditional logistic regression" = "#8DD3C7",
+                   "Cox Proportional Hazard" = "#FFFFB3",
+                   "DLNM" = "#BEBADA",
+                   "GLM" = "#FDB462",
+                   "Other" = "#B3DE69")
+
+method_counts <- dat %>%
+  group_by(PRIMARY, DESIGN, Meth) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  slice(1)
+
+# Now, create the heatmap with text labels
+p2 <- ggplot(method_counts, aes(x = PRIMARY, y = DESIGN, fill = Meth, label = Count)) +
+  geom_tile() +
+  geom_text(color = "black", size = 3) + # Add text labels
+  scale_fill_manual(values = method_colors) +
+  labs(x = "Outcome", y = "Design", fill = "Method") +
+  theme_minimal() + 
+  coord_flip() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),  # Remove panel border
+        axis.line = element_line(color = "black")) # Remove axis lines
+
+p2
+
+
+#ggsave("tileplotoutcome.png", p2, width = 10, height = 7, dpi = 300)
+
+
+```
+
+
+
+```{r}
+
+
+table(dat$HEAT)
+
+length(unique(dat$HEAT))
+
+```
+
+

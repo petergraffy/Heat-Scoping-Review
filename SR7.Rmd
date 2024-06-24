@@ -1,0 +1,166 @@
+---
+title: "SR2"
+author: "petergraffy"
+date: "2024-02-22"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(mapdata)
+library(mapproj)
+library(gridExtra)
+library(viridis)
+library(countrycode)
+library(tableone)
+library(kableExtra)
+
+```
+
+# read in the data
+
+```{r}
+
+dat <- read.csv("SR2.csv")
+
+```
+
+# get a reading on the types of studies/outcomes we have
+
+```{r}
+
+table(dat$MOR)
+table(dat$FACTOR)
+table(dat$FACTOR2)
+
+t1 <- table(dat$FACTOR, dat$MOR)
+t1
+write.csv(t1, "t1.csv", row.names = TRUE)
+
+t2 <- table(dat$FACTOR2, dat$MOR)
+t2
+write.csv(t2, "t2.csv", row.names = TRUE)
+
+```
+
+# split period column
+
+```{r}
+
+dat <- dat %>%
+  separate(PERIOD, into = c("start_year", "end_year"), sep = "-", convert = TRUE)
+
+# Convert the start_year and end_year columns to numeric
+dat$start_year <- as.numeric(dat$start_year)
+dat$end_year <- as.numeric(dat$end_year)
+
+# Calculate the difference between end_year and start_year
+dat$year_difference <- dat$end_year - dat$start_year
+
+
+
+```
+
+# group by continent
+
+```{r}
+
+dat$continent <- countrycode(dat$COUNTRY, "country.name", "continent")
+
+#write.csv(dat, "SR3.csv")
+
+```
+
+# read in the new dataframe
+
+```{r}
+
+dat2 <- read.csv("SR3rev.csv")
+
+```
+
+
+
+```{r}
+
+vars_to_modify <- c("Publication.Year", "Study.Design", "Data.Collection.Start", "Primary.Outcome", "Outcome.Type", "Study.Duration", "Continent")
+
+# Remove periods from variable names in dat2
+colnames(dat2)[match(vars_to_modify, colnames(dat2))] <- gsub("\\.", " ", vars_to_modify)
+
+# Create a new variable for decade
+
+dat2$`Publication Date` <- ifelse(dat2$`PUBYEAR` >= 1990 & dat2$`PUBYEAR` < 1995, "1990-1995",
+                      ifelse(dat2$`PUBYEAR` >= 1995 & dat2$`PUBYEAR` < 2000, "1995-2000",
+                             ifelse(dat2$`PUBYEAR` >= 2000 & dat2$`PUBYEAR` < 2005, "2000-2005",
+                                    ifelse(dat2$`PUBYEAR` >= 2005 & dat2$`PUBYEAR` < 2010, "2005-2010",
+                                           ifelse(dat2$`PUBYEAR` >= 2010 & dat2$`PUBYEAR` < 2015, "2010-2015",
+                                                  ifelse(dat2$`PUBYEAR` >= 2015 & dat2$`PUBYEAR` < 2020, "2015-2020",
+                                                         ifelse(dat2$`PUBYEAR` >= 2020 & dat2$`PUBYEAR` < 2025, "2020-Present", NA)))))))
+
+
+```
+
+
+
+# make a table 1
+
+```{r}
+decade_label <- function(start_year) {
+  end_year <- start_year + 9
+  return(paste(start_year, end_year, sep = "-"))
+}
+
+# Create a new variable for decade based on Data Collection Start
+dat2$`Study Start` <- cut(dat2$`START`, 
+                   breaks = seq(1880, 2020, by = 10),
+                   labels = sapply(seq(1880, 2010, by = 10), decade_label),
+                   include.lowest = TRUE)
+
+dat2$`Study Duration` <- ifelse(dat2$`DURATION` >= 0 & dat2$`DURATION` < 5, "0-5",
+                      ifelse(dat2$`DURATION` >= 5 & dat2$`DURATION` < 10, "5-10",
+                             ifelse(dat2$`DURATION` >= 10 & dat2$`DURATION` < 15, "10-15",
+                                    ifelse(dat2$`DURATION` >= 15 & dat2$`DURATION` < 20, "15-20",
+                                           ifelse(dat2$`DURATION` >= 20 & dat2$`DURATION` < 30, "20-30",
+                                                  ifelse(dat2$`DURATION` >= 30, "30+", NA))))))
+
+
+
+## Vector of variables to summarize
+myVars <- c("Study Start", "Meth", "Continent", "Study Duration",  "DESIGN")
+
+## Vector of categorical variables that need transformation
+catVars <- c("Study Start", "Meth", "Continent", "Study Duration", "DESIGN")
+
+
+
+## Create a TableOne object
+tab2 <- CreateTableOne(vars = myVars, data = dat2, factorVars = catVars)
+
+tab2out <- print(tab2, showAllLevels = TRUE)
+```
+
+\pagebreak
+
+```{r}
+kable(tab2out, booktabs = TRUE, longtable = TRUE)
+
+write.csv(tab2out, "table1_new.csv")
+
+```
+
+```{r}
+
+table(dat2$STAT)
+
+```
+
+
+
+
+
+

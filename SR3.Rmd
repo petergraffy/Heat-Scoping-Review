@@ -1,0 +1,339 @@
+---
+title: "SR3"
+author: "petergraffy"
+date: "2024-03-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(mapdata)
+library(mapproj)
+library(gridExtra)
+library(viridis)
+library(countrycode)
+library(tableone)
+library(kableExtra)
+
+```
+
+
+# read in SR3
+
+```{r}
+
+dat <- read.csv("SR3.csv" )
+
+```
+
+# we want CVD specifically
+
+
+```{r}
+
+table(dat$DESIGN, dat$Meth)
+
+table(dat$Meth)
+
+table(dat$Meth, dat$COUNTRY)
+
+```
+
+
+# cvd cases only
+
+```{r}
+
+cvd <- dat %>% filter(PRIMARY == 'CVD')
+
+#write.csv(cvd, "cvdstudies2.csv")
+
+```
+
+
+# make a big table 1
+
+```{r}
+
+cvd$`Publication Date` <- ifelse(cvd$PUBYEAR >= 1990 & cvd$PUBYEAR < 1995, "1990-1995",
+                      ifelse(cvd$PUBYEAR >= 1995 & cvd$PUBYEAR < 2000, "1995-2000",
+                             ifelse(cvd$PUBYEAR >= 2000 & cvd$PUBYEAR < 2005, "2000-2005",
+                                    ifelse(cvd$PUBYEAR >= 2005 & cvd$PUBYEAR < 2010, "2005-2010",
+                                           ifelse(cvd$PUBYEAR >= 2010 & cvd$PUBYEAR < 2015, "2010-2015",
+                                                  ifelse(cvd$PUBYEAR >= 2015 & cvd$PUBYEAR < 2020, "2015-2020",
+                                                         ifelse(cvd$PUBYEAR >= 2020 & cvd$PUBYEAR < 2025, "2020-Present", NA)))))))
+
+
+decade_label <- function(START) {
+  END <- START + 9
+  return(paste(START, END, sep = "-"))
+}
+
+cvd$`Study Start` <- cut(cvd$START, 
+                   breaks = seq(1880, 2020, by = 10),
+                   labels = sapply(seq(1880, 2010, by = 10), decade_label),
+                   include.lowest = TRUE)
+
+
+```
+
+
+# make the table
+
+```{r}
+
+## Vector of variables to summarize
+myVars <- c("Publication Date", "DESIGN", "Study Start", "PRIMARY", "OUTCOMETYPE", "DURATION", "Continent", "Meth")
+
+## Vector of categorical variables that need transformation
+catVars <- c("DESIGN", "PRIMARY", "OUTCOMETYPE", "Continent", "Study Start", "Publication Date", "Meth")
+
+
+
+## Create a TableOne object
+tab2 <- CreateTableOne(vars = myVars, data = cvd, factorVars = catVars)
+
+tab2out <- print(tab2, showAllLevels = TRUE)
+
+
+```
+
+\pagebreak
+
+```{r}
+
+kable(tab2out, booktabs = TRUE, longtable = TRUE)
+
+#write.csv(tab2out, "tablecvd.csv")
+
+```
+
+
+# run some basic stats
+
+```{r}
+
+length(unique(cvd$COUNTRY))
+
+table(cvd$COUNTRY)
+
+```
+
+# heatmap
+
+```{r}
+# 
+# cvd$COUNTRY <- as.factor(cvd$COUNTRY)
+# cvd$DESIGN <- as.factor(cvd$DESIGN)
+# cvd$Meth <- as.factor(cvd$Meth)
+# 
+# desired_countries <- c("Australia", "Brazil", "China", "Germany", "Greece", "Iran", "South Korea", "Switzerland", "USA", "Vietnam")
+# cvd_filtered <- cvd[cvd$COUNTRY %in% desired_countries, ]
+# 
+# # Now, create the heatmap
+# p1 <- ggplot(cvd_filtered, aes(x = COUNTRY, y = DESIGN, fill = Meth)) +
+#   geom_tile() +
+#   scale_fill_brewer(palette = "Set3") + # You can choose a different palette if needed
+#   labs(title = "Most Utilized Methodology by Countries with > 1 Study", x = "Country", y = "Design", fill = "Method") +
+#   theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1),
+#         panel.grid.major = element_blank(),  # Remove major gridlines
+#         panel.grid.minor = element_blank())+ theme(panel.grid.major = element_blank(), 
+#         panel.grid.minor = element_blank(),
+#         panel.border = element_blank(),  # Remove panel border
+#         axis.line = element_line(color = "black"))
+# 
+# p1
+# 
+# #ggsave("methdescountry.png", p1, width = 10, height = 7, dpi = 300)
+# 
+# p1 <- ggplot(cvd_filtered, aes(x = COUNTRY, y = DESIGN, fill = Meth)) +
+#   geom_tile() +
+#   geom_text(aes(label = Meth), color = "black", size = 3) + # Add text labels
+#   scale_fill_brewer(palette = "Set3") + # You can choose a different palette if needed
+#   labs(title = "Most Utilized Methodology by Countries with > 1 Study", x = "Country", y = "Design", fill = "Method") +
+#   theme_minimal() + 
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1),
+#         panel.grid.major = element_blank(),  # Remove major gridlines
+#         panel.grid.minor = element_blank(),
+#         panel.border = element_blank(),  # Remove panel border
+#         axis.line = element_line(color = "black"))
+# 
+# p1
+# 
+# 
+# 
+# p2 <- ggplot(cvd_filtered, aes(x = DESIGN, y = COUNTRY, fill = Meth)) +
+#   geom_tile() +
+#   scale_fill_brewer(palette = "Set3") + # You can choose a different palette if needed
+#   labs(x = "Design", y = "Country", fill = "Method") +
+#   coord_flip() + # Flip the axes
+#   theme_minimal() +
+#   theme(
+#     plot.margin = unit(c(1, 4, 1, 1), "cm"), # Adjust plot margin to make it longer
+#     aspect.ratio = 3/1 # Adjust aspect ratio to make it longer
+#   )
+
+#ggsave("methodprop.png", p7, width = 10, height = 7, dpi = 300)
+
+```
+
+
+```{r}
+
+cvd$COUNTRY <- as.factor(cvd$COUNTRY)
+cvd$DESIGN <- as.factor(cvd$DESIGN)
+cvd$Meth <- as.factor(cvd$Meth)
+
+# Define desired countries
+desired_countries <- c("Australia", "Brazil", "China", "Germany", "Greece", "Iran", "South Korea", "Switzerland", "USA", "Vietnam")
+
+# Filter the dataset
+cvd_filtered <- cvd %>% 
+  filter(COUNTRY %in% desired_countries)
+
+# Group by COUNTRY, DESIGN, and Meth, and count occurrences
+method_counts <- cvd_filtered %>%
+  group_by(COUNTRY, DESIGN, Meth) %>%
+  summarise(Count = n())
+
+# Now, create the heatmap with text labels
+p9 <- ggplot(method_counts, aes(x = COUNTRY, y = DESIGN, fill = Meth, label = Count)) +
+  geom_tile() +
+  geom_text(color = "black", size = 3) + # Add text labels
+  scale_fill_brewer(palette = "Set3") + # You can choose a different palette if needed
+  labs(title = "Method Counts by Countries with > 1 Study", x = "Country", y = "Design", fill = "Method") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),  # Remove panel border
+        axis.line = element_line(color = "black")) # Remove axis lines
+
+
+p9
+
+
+
+```
+
+
+```{r}
+
+cvd$COUNTRY <- as.factor(cvd$COUNTRY)
+cvd$DESIGN <- as.factor(cvd$DESIGN)
+cvd$Meth <- as.factor(cvd$Meth)
+
+# Define desired countries
+desired_countries <- c("Australia", "Brazil", "China", "Germany", "Greece", "Iran", "South Korea", "Switzerland", "USA", "Vietnam")
+
+# Filter the dataset
+cvd_filtered <- cvd %>% 
+  filter(COUNTRY %in% desired_countries)
+
+# Group by COUNTRY, DESIGN, and Meth, and count occurrences
+method_counts <- cvd_filtered %>%
+  group_by(COUNTRY, DESIGN, Meth) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  slice(1)  # Keep only the most frequent method for each combination of country and design
+
+# Now, create the heatmap with text labels
+p5 <- ggplot(method_counts, aes(x = COUNTRY, y = DESIGN, fill = Meth, label = Count)) +
+  geom_tile() +
+  geom_text(color = "black", size = 3) + # Add text labels
+  scale_fill_brewer(palette = "Set3") + # You can choose a different palette if needed
+  labs(x = "Country", y = "Design", fill = "Method") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),  # Remove panel border
+        axis.line = element_line(color = "black")) # Remove axis lines
+
+p5 
+
+
+#ggsave("methodcount.png", p5, width = 10, height = 7, dpi = 300)
+
+```
+
+# stacked bar plot
+
+```{r}
+
+# # Define the list of countries to include
+# included_countries <- c("China", "USA", "Brazil", "Australia", "Germany", "Vietnam", "Iran")
+# 
+# # Define the list of designs to exclude
+# excluded_designs <- c("Case-control", "Ecological", "Time series")
+# 
+# # Filter the dataset to include only the specified countries and exclude specified designs
+# cvd_filtered <- subset(cvd, COUNTRY %in% included_countries & !DESIGN %in% excluded_designs)
+# 
+# # Plot the data
+# ggplot(cvd_filtered, aes(x = COUNTRY, fill = Meth)) +
+#   geom_bar(position = "dodge") +
+#   facet_wrap(~DESIGN)
+# 
+# ggplot(cvd_filtered, aes(x = COUNTRY, fill = Meth)) +
+#   geom_bar(position = "stack") +
+#   facet_wrap(~DESIGN, ncol = 1) +  # Stacking plots vertically
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1),
+#         panel.grid.major = element_blank(),  # Remove major gridlines
+#         panel.grid.minor = element_blank())+ theme(panel.grid.major = element_blank(), 
+#         panel.grid.minor = element_blank(),
+#         panel.border = element_blank(),  # Remove panel border
+#         axis.line = element_line(color = "black")) + theme_bw()
+
+```
+
+
+# make a new plot of stat meth and design
+
+```{r}
+
+cvd$STAT2 <- as.factor(cvd$STAT2)
+cvd$Meth <- as.factor(cvd$Meth)
+cvd$DESIGN <- as.factor(cvd$DESIGN)
+
+cvd_filtered <- cvd %>%
+  filter(STAT2 != "Other")
+
+cvd_proportions <- cvd_filtered %>%
+  group_by(STAT2, DESIGN, Meth) %>%
+  summarise(Count = n()) %>%
+  group_by(STAT2, DESIGN) %>%
+  mutate(Proportion = Count / sum(Count))
+
+p3 <- ggplot(cvd_proportions, aes(x = STAT2, y = Proportion, fill = Meth)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_brewer(palette = "Set3") + # Match color scheme for Method
+  labs(x = "Statistic", y = "Proportion", fill = "Method") +
+  facet_wrap(~DESIGN, scales = "free_y") + # Separate plots for each design
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.major = element_blank(),  # Remove major gridlines
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),  # Remove panel border
+    axis.line = element_line(color = "black")
+  )
+
+
+p3 
+
+#ggsave("methdes.png", p3, width = 10, height = 7, dpi = 300)
+
+```
+
+
+
+
+
+
+
+
+
